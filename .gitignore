@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ignore SQLite databases
+*.db
+*.sqlite3
+*.sqlite
