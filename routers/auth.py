@@ -107,5 +107,5 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
     token = create_access_token(user.username, user.id, user.role, timedelta(minutes=30))
-    response.set_cookie(key="access_token", value=token, httponly=True, secure=False,samesite="lax")
+    response.set_cookie(key="access_token", value=token, httponly=False, secure=False,samesite="lax")
     return {"access_token": token, "token_type": "bearer"}

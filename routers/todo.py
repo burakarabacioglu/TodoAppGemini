@@ -23,7 +23,7 @@ templates = Jinja2Templates(directory="templates")
 
 
 class TodoRequest(BaseModel):
-    title: str = Field(min_length=3),
+    title: str = Field(min_length=3)
     description: str = Field(min_length=3, max_length=1000)
     priority: int = Field(gt=0, lt=6)
     complete: bool
@@ -65,7 +65,6 @@ def get_user_from_cookie(request: Request):
 @router.get("/todo-page", status_code=status.HTTP_200_OK)
 async def render_todo_page(request: Request, db: db_dependency):
     try:
-        # Use our cookie handler
         user = get_user_from_cookie(request)
 
         if user is None:
@@ -73,7 +72,6 @@ async def render_todo_page(request: Request, db: db_dependency):
 
         todos = db.query(Todo).filter(Todo.owner_id == user.get('id')).all()
 
-        # FIX: Also fixed the dictionary syntax typo from `user: "user"` to `"user": user`
         return templates.TemplateResponse(
             "todo.html",
             {"request": request, "todos": todos, "user": user}
@@ -82,7 +80,40 @@ async def render_todo_page(request: Request, db: db_dependency):
         logger.error(f"Error rendering todo page: {e}")
         return redirect_to_login()
 
+@router.get("/add-todo-page", status_code=status.HTTP_200_OK)
+async def render_add_todo_page(request: Request):
+    try:
+        user = get_user_from_cookie(request)
+        if user is None:
+            return redirect_to_login()
+        return templates.TemplateResponse(
+            "add-todo.html",
+            {"request": request,"user": user}
+        )
+    except Exception as e:
+        logger.error(f"Error rendering todo page: {e}")
+        return redirect_to_login()
 
+
+@router.get("/edit-todo-page/{todo_id}", status_code=status.HTTP_200_OK)
+async def render_edit_todo_page(request: Request, db: db_dependency, todo_id: int):
+    try:
+        user = get_user_from_cookie(request)
+        if user is None:
+            return redirect_to_login()
+
+        todo = db.query(Todo).filter(Todo.id == todo_id).filter(Todo.owner_id == user.get('id')).first()
+
+        if todo is None:
+            return RedirectResponse(url="/todo/todo-page", status_code=status.HTTP_302_FOUND)
+
+        return templates.TemplateResponse(
+            "edit-todo.html",
+            {"request": request, "todo": todo, "user": user}
+        )
+    except Exception as e:
+        logger.error(f"Error rendering edit todo page: {e}")
+        return redirect_to_login()
 
 @router.get("/")
 async def read_all(user: user_dependency, db: db_dependency):
@@ -99,7 +130,7 @@ async def get_todo(user: user_dependency, db: db_dependency, todo_id: int = Path
         return todo
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-@router.post("/create_todo", status_code=status.HTTP_201_CREATED)
+@router.post("/todo", status_code=status.HTTP_201_CREATED)
 async def create_todo(user: user_dependency, todo_request: TodoRequest, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
