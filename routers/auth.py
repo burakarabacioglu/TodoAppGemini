@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
 from starlette import status
@@ -63,7 +63,7 @@ def authenticate_user(username: str, password: str, db):
         return False
     return user
 
-def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload['sub']
@@ -80,7 +80,7 @@ def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
 async def render_login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
-@router.get("register-page")
+@router.get("/register-page")
 async def render_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
@@ -102,9 +102,10 @@ async def create_user(db:db_dependency, create_user_request: CreateUserRequest):
 
 @router.post("/token",response_model =Token,status_code=status.HTTP_201_CREATED)
 async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-                                 db: db_dependency):
+                                 db: db_dependency, response: Response):
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
     token = create_access_token(user.username, user.id, user.role, timedelta(minutes=30))
+    response.set_cookie(key="access_token", value=token, httponly=True, secure=False,samesite="lax")
     return {"access_token": token, "token_type": "bearer"}
